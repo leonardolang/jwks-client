@@ -4,7 +4,7 @@ use std::time::{Duration, SystemTime};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use crate::error::{err_inv, Error};
+use crate::error::{err_invalid, Error};
 
 macro_rules! impl_segment {
     () => (
@@ -47,7 +47,7 @@ macro_rules! impl_segment {
         }
 
         pub fn into<T: DeserializeOwned>(&self) -> Result<T, Error> {
-            Ok(serde_json::from_value::<T>(self.json.clone()).or(Err(err_inv("Failed to deserialize segment")))?)
+            Ok(serde_json::from_value::<T>(self.json.clone()).or_else(|e| Err(err_invalid(format!("Failed to deserialize segment: {:?}", e))))?)
         }
     )
 }

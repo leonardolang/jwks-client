@@ -4,7 +4,7 @@ use std::fmt;
 #[derive(Debug, PartialEq)]
 pub struct Error {
     /// Debug message associated with error
-    pub msg: &'static str,
+    pub msg: String,
     pub typ: Type,
 }
 
@@ -43,47 +43,47 @@ pub enum Type {
     Internal,
 }
 
-pub(crate) fn err(msg: &'static str, typ: Type) -> Error {
+pub(crate) fn err(msg: String, typ: Type) -> Error {
     Error { msg, typ }
 }
 
-pub(crate) fn err_inv(msg: &'static str) -> Error {
+pub(crate) fn err_invalid(msg: String) -> Error {
     err(msg, Type::Invalid)
 }
 
-pub(crate) fn err_exp(msg: &'static str) -> Error {
+pub(crate) fn err_exp(msg: String) -> Error {
     err(msg, Type::Expired)
 }
 
-pub(crate) fn err_nbf(msg: &'static str) -> Error {
+pub(crate) fn err_nbf(msg: String) -> Error {
     err(msg, Type::Early)
 }
 
-pub(crate) fn err_cer(msg: &'static str) -> Error {
+pub(crate) fn err_cert(msg: String) -> Error {
     err(msg, Type::Certificate)
 }
 
-pub(crate) fn err_key(msg: &'static str) -> Error {
+pub(crate) fn err_key(msg: String) -> Error {
     err(msg, Type::Key)
 }
 
-pub(crate) fn err_con(msg: &'static str) -> Error {
+pub(crate) fn err_get(msg: String) -> Error {
     err(msg, Type::Connection)
 }
 
-pub(crate) fn err_hea(msg: &'static str) -> Error {
+pub(crate) fn err_header(msg: String) -> Error {
     err(msg, Type::Header)
 }
 
-pub(crate) fn err_pay(msg: &'static str) -> Error {
+pub(crate) fn err_payload(msg: String) -> Error {
     err(msg, Type::Payload)
 }
 
-pub(crate) fn err_sig(msg: &'static str) -> Error {
+pub(crate) fn err_signature(msg: String) -> Error {
     err(msg, Type::Signature)
 }
 
-pub(crate) fn err_int(msg: &'static str) -> Error {
+pub(crate) fn err_internal(msg: String) -> Error {
     err(msg, Type::Internal)
 }
 
