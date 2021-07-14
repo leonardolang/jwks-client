@@ -22,10 +22,15 @@ pub struct JwtKey {
     #[serde(default)] // https://github.com/jfbilodeau/jwks-client/issues/1
     pub e: String,
     pub kty: String,
+    #[serde(default = "default_alg")]
     pub alg: String,
     #[serde(default)] // https://github.com/jfbilodeau/jwks-client/issues/1
     pub n: String,
     pub kid: String,
+}
+
+fn default_alg() -> String {
+    "".to_string()
 }
 
 impl JwtKey {
@@ -189,7 +194,7 @@ impl KeyStore {
     pub fn verify_time(&self, token: &str, time: SystemTime) -> Result<Jwt, Error> {
         let (header, payload, signature, body) = self.decode_segments(token)?;
 
-        if header.alg() != Some("RS256") {
+        if header.alg() != Some("RS256") && header.alg() != None {
             return Err(err_invalid(format!("Unsupported algorithm: {:?}", header.alg())));
         }
 
