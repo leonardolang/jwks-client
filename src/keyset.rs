@@ -206,6 +206,11 @@ impl KeyStore {
         let norm_e = (&key.e).replace("+", "-").replace("/", "_").replace("=", "");
         let norm_n = (&key.n).replace("+", "-").replace("/", "_").replace("=", "");
 
+        println!("{}", norm_e);
+        println!("{}", norm_n);
+        println!("{}", body);
+        println!("{}", signature);
+
         let e = decode_config(&norm_e, URL_SAFE_NO_PAD).or_else(|e| Err(err_cert(format!("Failed to decode exponent: {:?}", e))))?;
         let n = decode_config(&norm_n, URL_SAFE_NO_PAD).or_else(|e| Err(err_cert(format!("Failed to decode modulus: {:?}", e))))?;
 
