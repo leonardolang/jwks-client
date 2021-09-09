@@ -1,10 +1,10 @@
 use std::time::{Duration, SystemTime};
 
-use base64::{decode_config, URL_SAFE_NO_PAD};
+use base64::{decode_config, STANDARD, URL_SAFE_NO_PAD};
 use regex::Regex;
 use reqwest;
 use reqwest::Response;
-use ring::signature::{RsaPublicKeyComponents, RSA_PKCS1_2048_8192_SHA256};
+use ring::signature::{RsaPublicKeyComponents, RSA_PKCS1_512_8192_SHA256_FOR_LEGACY_USE_ONLY};
 use serde::{
     de::DeserializeOwned,
     {Deserialize, Serialize},
@@ -202,8 +202,23 @@ impl KeyStore {
 
         let key = self.key_by_id(kid).ok_or(err_key(format!("JWT key \"{:?}\" does not exists", kid)))?;
 
-        let e = decode_config(&key.e, URL_SAFE_NO_PAD).or_else(|e| Err(err_cert(format!("Failed to decode exponent: {:?}", e))))?;
-        let n = decode_config(&key.n, URL_SAFE_NO_PAD).or_else(|e| Err(err_cert(format!("Failed to decode modulus: {:?}", e))))?;
+        // normalize parameters for non-standard implementations that use base64/standard instead of base64/url
+        let stdb64_e = (&key.e).replace("-", "+").replace("_", "/");
+        let stdb64_n = (&key.n).replace("-", "+").replace("_", "/");
+
+        let raw_e = decode_config(&stdb64_e, STANDARD).or_else(|e| Err(err_cert(format!("Failed to decode exponent: {:?}", e))))?;
+        let raw_n = decode_config(&stdb64_n, STANDARD).or_else(|e| Err(err_cert(format!("Failed to decode modulus: {:?}", e))))?;
+
+        // remove leading zero from rsa parameters (causes key to be rejected by ring)
+        let n = match (raw_n.first().cloned(), raw_n) {
+            (Some(0), n) => n[1..n.len()].to_vec(),
+            (     _ , n) => n
+        };
+
+        let e = match (raw_e.first().cloned(), raw_e) {
+            (Some(0), e) => e[1..e.len()].to_vec(),
+            (     _ , e) => e
+        };
 
         verify_signature(&e, &n, &body, &signature)?;
 
@@ -304,7 +319,8 @@ fn verify_signature(e: &Vec<u8>, n: &Vec<u8>, message: &str, signature: &str) ->
     let message_bytes = &message.as_bytes().to_vec();
     let signature_bytes = decode_config(&signature, URL_SAFE_NO_PAD).or_else(|e| Err(err_signature(format!("Could not base64 decode signature: {:?}", e))))?;
 
-    let result = pkc.verify(&RSA_PKCS1_2048_8192_SHA256, &message_bytes, &signature_bytes);
+    // use RSA_PKCS1_512_8192_SHA256_FOR_LEGACY_USE_ONLY to allow validation of smaller keys
+    let result = pkc.verify(&RSA_PKCS1_512_8192_SHA256_FOR_LEGACY_USE_ONLY, &message_bytes, &signature_bytes);
 
     result.or_else(|e| Err(err_cert(format!("Signature does not match certificate: {:?}", e))))
 }
