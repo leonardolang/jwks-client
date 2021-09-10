@@ -50,7 +50,9 @@ impl JwtKey {
     pub fn decoding_key(&self) -> Result<&DecodingKey, Error> {
         match &self.kind {
             JwtKeyKind::RSA(key) => Ok(key),
-            JwtKeyKind::UnsupportedKty(kty) => Err(err("Unsupported key type", ErrorKind::UnsupportedKeyType(kty.to_owned()))),
+            JwtKeyKind::UnsupportedKty(kty) => Err(
+                err::new(format!("Unsupported key type '{}'", kty), ErrorKind::UnsupportedKeyType(kty.to_owned()))
+            ),
         }
     }
 }
@@ -60,8 +62,17 @@ impl TryFrom<JWK> for JwtKey {
 
     fn try_from(JWK { kid, alg, kty, n, e }: JWK) -> Result<Self, Error> {
         let kind = match (kty.as_ref(), n, e) {
-            ("RSA", Some(n), Some(e)) => JwtKeyKind::RSA(DecodingKey::from_rsa_components(&n, &e).into_static()),
-            ("RSA", _, _) => return Err(err("RSA key misses parameters", ErrorKind::Key)),
+            ("RSA", Some(n), Some(e)) => {
+                JwtKeyKind::RSA(DecodingKey::from_rsa_components(&n, &e).into_static())
+            },
+            ("RSA", n, e) => {
+                return Err(err::new(
+                    format!("RSA key missing parameters (e={}, n={})",
+                        if e == None { "present" } else { "missing" },
+                        if n == None { "present" } else { "missing" }
+                    ),
+                    ErrorKind::Key))
+            },
             (_, _, _) => JwtKeyKind::UnsupportedKty(kty),
         };
         Ok(JwtKey { kid, alg, kind })
@@ -121,7 +132,9 @@ impl KeyStore {
             pub keys: Vec<JWK>,
         }
 
-        let mut response = reqwest::get(&self.key_url).await.map_err(|e| err_get(format!("Could not download JWKS: {:?}", e)))?;
+        let mut response = reqwest::get(&self.key_url).await.map_err(|e| {
+            err::get(format!("Could not download JWKS: {:?}", e))
+        })?;
 
         let load_time = SystemTime::now();
         self.load_time = Some(load_time);
@@ -136,7 +149,9 @@ impl KeyStore {
             self.refresh_time = Some(refresh);
         }
 
-        let jwks = response.json::<JwtKeys>().await.map_err(|e| err_internal(format!("Failed to parse keys {:?}", e)))?;
+        let jwks = response.json::<JwtKeys>().await.map_err(|e| {
+            err::int(format!("Failed to parse keys {:?}", e))
+        })?;
 
         for jwk in jwks.keys {
             self.add_key(jwk.try_into()?);
@@ -188,17 +203,20 @@ impl KeyStore {
     /// * It is not expired
     /// * The `nbf` is not set to before now
     pub fn verify<T: DeserializeOwned>(&self, token: &str, validation: &Validation) -> Result<TokenData<T>, Error> {
-        let header = jsonwebtoken::decode_header(token).map_err(err_jwt)?;
+        let header = jsonwebtoken::decode_header(token).map_err(err::jwt)?;
 
-        let kid = header.kid.ok_or_else(|| err_key("No key id"))?;
+        let kid = header.kid.ok_or_else(|| err::key(format!("No key id")))?;
 
-        let key = self.key_by_id(&kid).ok_or_else(|| err_key("JWT key does not exists"))?;
+        let key = self.key_by_id(&kid).ok_or_else(|| err::key(format!("JWT key '{}' does not exists", kid)))?;
 
         if key.alg != header.alg {
-            return Err(err("Token and its key have non-matching algorithms", ErrorKind::AlgorithmMismatch));
+            return Err(err::new(
+                format!("Token and its key have non-matching algorithms ({:?} != {:?})", key.alg, header.alg),
+                ErrorKind::AlgorithmMismatch
+            ));
         }
 
-        let data = jsonwebtoken::decode(token, key.decoding_key()?, &validation).map_err(err_jwt)?;
+        let data = jsonwebtoken::decode(token, key.decoding_key()?, &validation).map_err(err::jwt)?;
 
         Ok(data)
     }

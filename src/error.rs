@@ -1,24 +1,15 @@
 use std::fmt::{Display, Formatter};
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)] // , PartialEq)]
 pub struct Error {
     /// Debug message associated with error
     pub msg: String,
-    pub typ: Type,
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}: {}", self.typ, self.msg)
-    }
-}
-
-impl std::error::Error for Error {
+    pub kind: ErrorKind,
 }
 
 /// Type of error encountered
-#[derive(Debug)]
+#[derive(Debug)] // , PartialEq)]
 pub enum ErrorKind {
     /// An error decoding or validating a token
     JwtDecodeError(Box<jsonwebtoken::errors::ErrorKind>),
@@ -34,48 +25,38 @@ pub enum ErrorKind {
     Internal,
 }
 
-pub(crate) fn err(msg: String, typ: Type) -> Error {
-    Error { msg, typ }
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}: {}", self.kind, self.msg)
+    }
 }
 
-pub(crate) fn err_invalid(msg: String) -> Error {
-    err(msg, Type::Invalid)
-}
+//impl std::error::Error for Error {
+//}
 
-pub(crate) fn err_exp(msg: String) -> Error {
-    err(msg, Type::Expired)
-}
+pub mod err {
+    use crate::error::Error;
+    use crate::error::ErrorKind;
 
-pub(crate) fn err_nbf(msg: String) -> Error {
-    err(msg, Type::Early)
-}
+    pub(crate) fn new(msg: String, kind: ErrorKind) -> Error {
+        Error { msg, kind }
+    }
 
-pub(crate) fn err_cert(msg: String) -> Error {
-    err(msg, Type::Certificate)
-}
+    pub(crate) fn key(msg: String) -> Error {
+        new(msg, ErrorKind::Key)
+    }
 
-pub(crate) fn err_key(msg: String) -> Error {
-    err(msg, Type::Key)
-}
+    pub(crate) fn get(msg: String) -> Error {
+        new(msg, ErrorKind::Connection)
+    }
 
-pub(crate) fn err_get(msg: String) -> Error {
-    err(msg, Type::Connection)
-}
+    pub(crate) fn int(msg: String) -> Error {
+        new(msg, ErrorKind::Internal)
+    }
 
-pub(crate) fn err_header(msg: String) -> Error {
-    err(msg, Type::Header)
-}
-
-pub(crate) fn err_payload(msg: String) -> Error {
-    err(msg, Type::Payload)
-}
-
-pub(crate) fn err_signature(msg: String) -> Error {
-    err(msg, Type::Signature)
-}
-
-pub(crate) fn err_internal(msg: String) -> Error {
-    err(msg, Type::Internal)
+    pub(crate) fn jwt(error: jsonwebtoken::errors::Error) -> Error {
+        new(format!("{:?}", error), ErrorKind::JwtDecodeError(Box::new(error.into_kind())))
+    }
 }
 
 #[cfg(test)]
