@@ -68,13 +68,16 @@ impl TryFrom<JWK> for JwtKey {
     fn try_from(JWK { kid, alg, kty, n, e }: JWK) -> Result<Self, Error> {
         let kind = match (kty.as_ref(), n, e) {
             ("RSA", Some(n), Some(e)) => {
-                JwtKeyKind::RSA(DecodingKey::from_rsa_components(&n, &e).into_static())
+                // normalize parameters for non-standard implementations that use base64/standard instead of base64/url
+                let norm_n = (&n).replace("+", "-").replace("/", "_");
+                let norm_e = (&e).replace("+", "-").replace("/", "_");
+                JwtKeyKind::RSA(DecodingKey::from_rsa_components(&norm_n, &norm_e).into_static())
             },
             ("RSA", n, e) => {
                 return Err(err::new(
-                    format!("RSA key missing parameters (e={}, n={})",
+                    format!("RSA key missing parameters (n={}, e={})",
+                        if n == None { "present" } else { "missing" },
                         if e == None { "present" } else { "missing" },
-                        if n == None { "present" } else { "missing" }
                     ),
                     ErrorKind::Key))
             },
