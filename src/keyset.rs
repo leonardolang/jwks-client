@@ -69,8 +69,10 @@ impl TryFrom<JWK> for JwtKey {
         let kind = match (kty.as_ref(), n, e) {
             ("RSA", Some(n), Some(e)) => {
                 // normalize parameters for non-standard implementations that use base64/standard instead of base64/url
-                let norm_n = (&n).replace("+", "-").replace("/", "_");
-                let norm_e = (&e).replace("+", "-").replace("/", "_");
+                let norm_n = (&n).replace("+", "-").replace("/", "_").replace("=", "");
+                let norm_e = (&e).replace("+", "-").replace("/", "_").replace("=", "");
+                println!("{}", norm_n);
+                println!("{}", norm_e);
                 JwtKeyKind::RSA(DecodingKey::from_rsa_components(&norm_n, &norm_e).into_static())
             },
             ("RSA", n, e) => {
