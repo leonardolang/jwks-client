@@ -43,48 +43,52 @@ pub enum Type {
     Internal,
 }
 
-pub(crate) fn err(msg: String, typ: Type) -> Error {
-    Error { msg, typ }
-}
+pub mod err {
+    use crate::error::{Type, Error};
 
-pub(crate) fn err_invalid(msg: String) -> Error {
-    err(msg, Type::Invalid)
-}
+    pub(crate) fn new(msg: String, typ: Type) -> Error {
+        Error { msg, typ }
+    }
 
-pub(crate) fn err_exp(msg: String) -> Error {
-    err(msg, Type::Expired)
-}
+    pub(crate) fn invalid(msg: String) -> Error {
+        new(msg, Type::Invalid)
+    }
 
-pub(crate) fn err_nbf(msg: String) -> Error {
-    err(msg, Type::Early)
-}
+    pub(crate) fn exp(msg: String) -> Error {
+        new(msg, Type::Expired)
+    }
 
-pub(crate) fn err_cert(msg: String) -> Error {
-    err(msg, Type::Certificate)
-}
+    pub(crate) fn nbf(msg: String) -> Error {
+        new(msg, Type::Early)
+    }
 
-pub(crate) fn err_key(msg: String) -> Error {
-    err(msg, Type::Key)
-}
+    pub(crate) fn cert(msg: String) -> Error {
+        new(msg, Type::Certificate)
+    }
 
-pub(crate) fn err_get(msg: String) -> Error {
-    err(msg, Type::Connection)
-}
+    pub(crate) fn key(msg: String) -> Error {
+        new(msg, Type::Key)
+    }
 
-pub(crate) fn err_header(msg: String) -> Error {
-    err(msg, Type::Header)
-}
+    pub(crate) fn get(msg: String) -> Error {
+        new(msg, Type::Connection)
+    }
 
-pub(crate) fn err_payload(msg: String) -> Error {
-    err(msg, Type::Payload)
-}
+    pub(crate) fn header(msg: String) -> Error {
+        new(msg, Type::Header)
+    }
 
-pub(crate) fn err_signature(msg: String) -> Error {
-    err(msg, Type::Signature)
-}
+    pub(crate) fn payload(msg: String) -> Error {
+        new(msg, Type::Payload)
+    }
 
-pub(crate) fn err_internal(msg: String) -> Error {
-    err(msg, Type::Internal)
+    pub(crate) fn signature(msg: String) -> Error {
+        new(msg, Type::Signature)
+    }
+
+    pub(crate) fn internal(msg: String) -> Error {
+        new(msg, Type::Internal)
+    }
 }
 
 #[cfg(test)]
