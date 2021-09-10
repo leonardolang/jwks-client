@@ -10,16 +10,21 @@ use crate::error::*;
 
 #[derive(Debug, Deserialize)]
 pub struct JWK {
-    pub alg: jsonwebtoken::Algorithm,
+    #[serde(default = "default_alg")]
+    pub alg: Algorithm,
     pub kid: String,
     pub kty: String,
     pub e: Option<String>,
     pub n: Option<String>,
 }
 
+fn default_alg() -> Algorithm {
+    Algorithm::RS256
+}
+
 #[derive(Debug)]
 pub struct JwtKey {
-    pub alg: jsonwebtoken::Algorithm,
+    pub alg: Algorithm,
     pub kid: String,
     pub kind: JwtKeyKind,
 }
