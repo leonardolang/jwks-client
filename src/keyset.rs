@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use base64::{decode_config, URL_SAFE_NO_PAD};
+use base64::{decode_config, URL_SAFE_NO_PAD, STANDARD_NO_PAD};
 use regex::Regex;
 use reqwest;
 use reqwest::Response;
@@ -203,16 +203,18 @@ impl KeyStore {
         let key = self.key_by_id(kid).ok_or(err_key(format!("JWT key \"{:?}\" does not exists", kid)))?;
 
         // normalize parameters for non-standard implementations that use base64/standard instead of base64/url
-        let norm_e = (&key.e).replace("+", "-").replace("/", "_").replace("=", "");
-        let norm_n = (&key.n).replace("+", "-").replace("/", "_").replace("=", "");
+//        let norm_e = (&key.e).replace("+", "-").replace("/", "_").replace("=", "");
+//        let norm_n = (&key.n).replace("+", "-").replace("/", "_").replace("=", "");
 
+        let norm_e = key.e.clone();
+        let norm_n = key.n.clone();
         println!("{}", norm_e);
         println!("{}", norm_n);
         println!("{}", body);
         println!("{}", signature);
 
-        let e = decode_config(&norm_e, URL_SAFE_NO_PAD).or_else(|e| Err(err_cert(format!("Failed to decode exponent: {:?}", e))))?;
-        let n = decode_config(&norm_n, URL_SAFE_NO_PAD).or_else(|e| Err(err_cert(format!("Failed to decode modulus: {:?}", e))))?;
+        let e = decode_config(&norm_e, STANDARD_NO_PAD /*URL_SAFE_NO_PAD*/).or_else(|e| Err(err_cert(format!("Failed to decode exponent: {:?}", e))))?;
+        let n = decode_config(&norm_n, STANDARD_NO_PAD /*URL_SAFE_NO_PAD*/).or_else(|e| Err(err_cert(format!("Failed to decode modulus: {:?}", e))))?;
 
         verify_signature(&e, &n, &body, &signature)?;
 
