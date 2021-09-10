@@ -18,27 +18,18 @@ impl std::error::Error for Error {
 }
 
 /// Type of error encountered
-#[derive(Debug, PartialEq)]
-pub enum Type {
-    /// Token is invalid
-    /// For example, the format of the token is not "HEADER.PAYLOAD.SIGNATURE"
-    Invalid,
-    /// Token has expired
-    Expired,
-    /// Not Before (nbf) is set and it's too early to use the token
-    Early,
-    /// Problem with certificate
-    Certificate,
+#[derive(Debug)]
+pub enum ErrorKind {
+    /// An error decoding or validating a token
+    JwtDecodeError(Box<jsonwebtoken::errors::ErrorKind>),
     /// Problem with key
     Key,
     /// Could not download key set
     Connection,
-    /// Problem with JWT header
-    Header,
-    /// Problem with JWT payload
-    Payload,
-    /// Problem with JWT signature
-    Signature,
+    /// Unsupported key type, only RSA is currently supported
+    UnsupportedKeyType(String),
+    /// Algorithm mismatch - algorithm of token doesn't match intended algorithm of key
+    AlgorithmMismatch,
     /// Internal problem (Signals a serious bug or fatal error)
     Internal,
 }
