@@ -4,6 +4,8 @@ pub mod keyset;
 pub use error::Error;
 pub use keyset::{JwtKey, KeyStore};
 
+pub use jsonwebtoken as jwt;
+
 ///JWKS client library [![Build Status](https://travis-ci.com/jfbilodeau/jwks-client.svg?branch=master)](https://travis-ci.com/jfbilodeau/jwks-client) [![License:MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 ///===
 ///JWKS-Client is a library written in Rust to decode and validate JWT tokens using a JSON Web Key Store.
