@@ -330,6 +330,7 @@ name = "jwks-client"
 version = "0.2.0"
 dependencies = [
  "base64 0.11.0",
+ "log",
  "regex",
  "reqwest",
  "ring",

@@ -1,6 +1,6 @@
 use std::time::{Duration, SystemTime};
 
-use base64::{decode_config, STANDARD, URL_SAFE_NO_PAD};
+use base64::{decode_config, Config, STANDARD_NO_PAD};
 use regex::Regex;
 use reqwest;
 use reqwest::Response;
@@ -10,9 +10,11 @@ use serde::{
     {Deserialize, Serialize},
 };
 use serde_json::Value;
+use log::{info, debug};
 
 use crate::error::*;
 use crate::jwt::*;
+
 
 type HeaderBody = String;
 pub type Signature = String;
@@ -31,6 +33,18 @@ pub struct JwtKey {
 
 fn default_alg() -> String {
     "".to_string()
+}
+
+fn normalize_and_decode(data: &str) -> Result<Vec<u8>, base64::DecodeError>
+{
+    let data_std64 = data.replace("-", "+").replace("_", "/");
+    let data_bytes = &mut data_std64.as_bytes().to_vec();
+    let leftover = data_bytes.len() % 4;
+    let pad = if leftover != 0 { 4 - leftover } else { 0 };
+    for _ in 0..pad { data_bytes.push(b'='); };
+    debug!("=> {}", String::from_utf8_lossy(data_bytes));
+    let forgiving_urlsafe_nopad = Config::decode_allow_trailing_bits(STANDARD_NO_PAD, true);
+    decode_config(&data_bytes, forgiving_urlsafe_nopad)
 }
 
 impl JwtKey {
@@ -203,20 +217,17 @@ impl KeyStore {
         let key = self.key_by_id(kid).ok_or(err::key(format!("JWT key \"{:?}\" does not exists", kid)))?;
 
         // normalize parameters for non-standard implementations that use base64/standard instead of base64/url
-        let stdb64_e = (&key.e).replace("-", "+").replace("_", "/");
-        let stdb64_n = (&key.n).replace("-", "+").replace("_", "/");
-
-        let raw_e = decode_config(&stdb64_e, STANDARD).or_else(|e| Err(err::cert(format!("Failed to decode exponent: {:?}", e))))?;
-        let raw_n = decode_config(&stdb64_n, STANDARD).or_else(|e| Err(err::cert(format!("Failed to decode modulus: {:?}", e))))?;
+        let raw_e = normalize_and_decode(&key.e).or_else(|e| Err(err::cert(format!("Failed to decode exponent: {:?}", e))))?;
+        let raw_n = normalize_and_decode(&key.n).or_else(|e| Err(err::cert(format!("Failed to decode modulus: {:?}", e))))?;
 
         // remove leading zero from rsa parameters (causes key to be rejected by ring)
         let n = match (raw_n.first().cloned(), raw_n) {
-            (Some(0), n) => n[1..n.len()].to_vec(),
+            (Some(0), n) => { info!("removing loading zero from modulus"); n[1..n.len()].to_vec() },
             (     _ , n) => n
         };
 
         let e = match (raw_e.first().cloned(), raw_e) {
-            (Some(0), e) => e[1..e.len()].to_vec(),
+            (Some(0), e) => { info!("removing loading zero from exponent"); e[1..e.len()].to_vec() },
             (     _ , e) => e
         };
 
@@ -313,11 +324,12 @@ impl KeyStore {
     }
 }
 
+
 fn verify_signature(e: &Vec<u8>, n: &Vec<u8>, message: &str, signature: &str) -> Result<(), Error> {
     let pkc = RsaPublicKeyComponents { e, n };
 
     let message_bytes = &message.as_bytes().to_vec();
-    let signature_bytes = decode_config(&signature, URL_SAFE_NO_PAD).or_else(|e| Err(err::signature(format!("Could not base64 decode signature: {:?}", e))))?;
+    let signature_bytes = normalize_and_decode(signature).or_else(|e| Err(err::signature(format!("Could not base64 decode signature: {:?}", e))))?;
 
     // use RSA_PKCS1_512_8192_SHA256_FOR_LEGACY_USE_ONLY to allow validation of smaller keys
     let result = pkc.verify(&RSA_PKCS1_512_8192_SHA256_FOR_LEGACY_USE_ONLY, &message_bytes, &signature_bytes);
@@ -326,7 +338,7 @@ fn verify_signature(e: &Vec<u8>, n: &Vec<u8>, message: &str, signature: &str) ->
 }
 
 fn decode_segment<T: DeserializeOwned>(segment: &str) -> Result<T, Error> {
-    let raw = decode_config(segment, base64::URL_SAFE_NO_PAD).or_else(|e| Err(err::invalid(format!("Failed to decode segment: {:?}", e))))?;
+    let raw = normalize_and_decode(segment).or_else(|e| Err(err::invalid(format!("Failed to decode segment: {:?}", e))))?;
     let slice = String::from_utf8_lossy(&raw);
     let decoded: T = serde_json::from_str(&slice).or_else(|e| Err(err::invalid(format!("Failed to decode segment: {:?}", e))))?;
 
