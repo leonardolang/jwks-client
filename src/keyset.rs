@@ -205,7 +205,7 @@ impl KeyStore {
         Ok(Jwt::new(header, payload, signature))
     }
 
-    pub fn verify_time(&self, token: &str, time: SystemTime) -> Result<Jwt, Error> {
+    pub fn verify_time_opt(&self, token: &str, time: Option<SystemTime>) -> Result<Jwt, Error> {
         let (header, payload, signature, body) = self.decode_segments(token)?;
 
         if header.alg() != Some("RS256") && header.alg() != None {
@@ -235,14 +235,20 @@ impl KeyStore {
 
         let jwt = Jwt::new(header, payload, signature);
 
-        if jwt.expired_time(time).unwrap_or(false) {
-            return Err(err::exp(format!("Token expired (exp={:?})", jwt.payload().expiry())));
-        }
-        if jwt.early_time(time).unwrap_or(false) {
-            return Err(err::nbf(format!("Too early to use token (nbf={:?})", jwt.payload().not_before())));
+        if let Some(time) = time {
+            if jwt.expired_time(time).unwrap_or(false) {
+                return Err(err::exp(format!("Token expired (exp={:?})", jwt.payload().expiry())));
+            }
+            if jwt.early_time(time).unwrap_or(false) {
+                return Err(err::nbf(format!("Too early to use token (nbf={:?})", jwt.payload().not_before())));
+            }
         }
 
         Ok(jwt)
+    }
+
+    pub fn verify_time(&self, token: &str, time: SystemTime) -> Result<Jwt, Error> {
+        self.verify_time_opt(token, Some(time))
     }
 
     /// Verify a JWT token.
