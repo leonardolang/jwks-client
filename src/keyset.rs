@@ -1,9 +1,11 @@
-use std::time::{Duration, SystemTime};
+use std::{
+    env,
+    time::{Duration, SystemTime}
+};
 
 use base64::{decode_config, Config, STANDARD_NO_PAD};
 use regex::Regex;
-use reqwest;
-use reqwest::Response;
+use reqwest::{Client, ClientBuilder, Proxy, Response};
 use ring::signature::{RsaPublicKeyComponents, RSA_PKCS1_512_8192_SHA256_FOR_LEGACY_USE_ONLY};
 use serde::{
     de::DeserializeOwned,
@@ -47,6 +49,35 @@ fn normalize_and_decode(data: &str) -> Result<Vec<u8>, base64::DecodeError>
     decode_config(&data_bytes, forgiving_urlsafe_nopad)
 }
 
+fn build_client() -> Result<Client, Error> {
+    let mut builder = {
+        ClientBuilder::new()
+        .connection_verbose(env::var("TRACE").unwrap_or_else(|_| "0".to_string()) == *"1")
+        .timeout(Duration::new(30,0)) // do not allow client connections to hang indefinitely
+        .pool_idle_timeout(Some(Duration::new(30,0))) // restrict idle connections to 30s
+        .pool_max_idle_per_host(5) // limit amount of idle connections
+        .user_agent("jwks-client")
+    };
+
+    match env::var("http_proxy") {
+        Ok(http_proxy) => {
+            let proxy = Proxy::http(http_proxy).map_err(|e| err::internal(format!("Unable to setup HTTP proxy: {:?}", e)))?;
+            builder = builder.proxy(proxy);
+        },
+        Err(_) => (),
+    };
+
+    match env::var("https_proxy") {
+        Ok(https_proxy) => {
+            let proxy = Proxy::https(https_proxy).map_err(|e| err::internal(format!("Unable to setup HTTPS proxy: {:?}", e)))?;
+            builder = builder.proxy(proxy);
+        },
+        Err(_) => (),
+    };
+
+    builder.build().map_err(|e| err::internal(format!("Failed to build reqwest client {:?}", e)))
+}
+
 impl JwtKey {
     pub fn new(kid: &str, n: &str, e: &str) -> JwtKey {
         JwtKey {
@@ -78,10 +109,17 @@ pub struct KeyStore {
     load_time: Option<SystemTime>,
     expire_time: Option<SystemTime>,
     refresh_time: Option<SystemTime>,
+    client: Client,
 }
 
 impl KeyStore {
+    // Compatibility with previous infallible API
+    // new() panics if Client fails to build
     pub fn new() -> KeyStore {
+        Self::try_new().unwrap()
+    }
+
+    pub fn try_new() -> Result<KeyStore, Error> {
         let key_store = KeyStore {
             key_url: "".to_owned(),
             keys: vec![],
@@ -89,9 +127,10 @@ impl KeyStore {
             load_time: None,
             expire_time: None,
             refresh_time: None,
+            client: build_client()?,
         };
 
-        key_store
+        Ok(key_store)
     }
 
     pub async fn new_from(jkws_url: String) -> Result<KeyStore, Error> {
@@ -126,7 +165,7 @@ impl KeyStore {
             pub keys: Vec<JwtKey>,
         }
 
-        let mut response = reqwest::get(&self.key_url).await.map_err(|e| err::get(format!("Could not download JWKS: {:?}", e)))?;
+        let mut response = self.client.get(&self.key_url).send().await.map_err(|e| err::get(format!("Could not download JWKS: {:?}", e)))?;
 
         let load_time = SystemTime::now();
         self.load_time = Some(load_time);
